@@ -1,0 +1,79 @@
+======================================================================
+CHANGELOG — Módulo Servidor (Docker & Banco de Dados (SQLite acessado pelo Flask-SQLAlchemy (ORM))
+Projeto: Locadora de Filmes - Inhuma
+======================================================================
+
+
+ADICIONADO
+
+  Infraestrutura
+  - API REST em Flask 3.1.0 (app.py), escutando em 0.0.0.0:5000 com debug=True.
+  - Persistencia em SQLite via Flask-SQLAlchemy 3.1.1 (database.py), com o
+    arquivo locadora.db criado na pasta do servidor.
+  - Criacao automatica das tabelas na inicializacao (db.create_all()), sem
+    necessidade de script SQL.
+  - Rota de status GET /, que responde:
+    {"status": "API da Locadora Rodando com SQLite com Sucesso!"}
+  - Organizacao em Blueprints: clientes_bp, filmes_bp e locadora_bp (pasta
+    routes/).
+  - requirements.txt com as dependencias do servidor.
+  - Dockerfile baseado em python:3.11-slim: instala as dependencias, expoe a
+    porta 5000 e executa "python app.py".
+  - docker-compose.yml com o servico "servidor" (container locadora_api):
+    build a partir de ./servidor, porta 5000:5000, restart: unless-stopped e
+    volume ./servidor:/app, que mantem o locadora.db e o codigo no computador
+    e permite editar o codigo sem refazer a imagem.
+
+  Modelos de dados (models.py)
+  - Filme (tabela filmes): id, titulo (obrigatorio), genero, diretor,
+    quantidade (obrigatorio, padrao 0), classificacao.
+  - Cliente (tabela clientes): id, nome (obrigatorio), cpf (obrigatorio e
+    unico), telefone, email.
+  - Locacao (tabela locacoes): id, id_cliente (chave estrangeira), id_filme
+    (chave estrangeira), data_locacao, data_prevista, devolvida (padrao False).
+  - Relacionamentos Locacao.cliente e Locacao.filme, com backref "locacoes"
+    em Cliente e Filme.
+
+  Endpoints
+  - GET    /clientes                  Lista os clientes (id, nome, cpf,
+                                      telefone, email).
+                                      Resposta: 200.
+  - POST   /clientes                  Cadastra um cliente a partir de JSON.
+                                      Resposta: 201 com o id.
+  - DELETE /clientes/<id>             Exclui um cliente.
+                                      Respostas: 200, 400, 404.
+  - GET    /filmes                    Lista os filmes (id, titulo, genero,
+                                      diretor, quantidade, classificacao).
+                                      Resposta: 200.
+  - POST   /filmes                    Cadastra um filme (quantidade padrao 1).
+                                      Resposta: 201 com o id.
+  - DELETE /filmes/<id>               Exclui um filme.
+                                      Respostas: 200, 400, 404.
+  - GET    /locacoes                  Lista as locacoes com cliente, cpf,
+                                      filme, classificacao, data_locacao,
+                                      data_prevista (formato AAAA-MM-DD) e
+                                      devolvida.
+                                      Resposta: 200.
+  - POST   /locacoes                  Registra uma locacao (id_cliente,
+                                      id_filme, dias; padrao 7).
+                                      Respostas: 201, 400, 404.
+  - PUT    /locacoes/<id>/devolver    Registra a devolucao de uma locacao.
+                                      Respostas: 200, 400, 404.
+
+  Regras de negocio
+  - Controle de estoque: ao registrar uma locacao, a quantidade do filme
+    diminui em 1. Ao devolver, aumenta em 1.
+  - Filme esgotado: locar um filme com quantidade <= 0 retorna erro 400
+    ("Filme esgotado").
+  - Data prevista: calculada automaticamente como a data de hoje somada a
+    quantidade de dias.
+  - Devolucao unica: devolver uma locacao ja devolvida retorna erro 400.
+  - Exclusao de cliente: bloqueada com erro 400 se o cliente tiver locacao em
+    aberto (nao devolvida).
+  - Exclusao de filme: bloqueada com erro 400 se o filme tiver locacao em
+    aberto. Quando permitida, o historico de locacoes ja devolvidas do filme
+    e removido antes, para evitar erro de chave estrangeira.
+  - CPF unico: o banco impede dois clientes com o mesmo CPF.
+  - Retorno 404 automatico (get_or_404) para clientes, filmes e locacoes
+    inexistentes.
+
